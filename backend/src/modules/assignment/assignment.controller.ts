@@ -19,6 +19,19 @@ export class AssignmentController {
     }
   }
 
+  async getAll(req: Request, res: Response): Promise<void> {
+    try {
+      const { courseId, status } = req.query;
+      const assignments = await assignmentService.findAll({
+        courseId: courseId as string,
+        status: status as any,
+      });
+      res.json({ success: true, data: assignments });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
   async get(req: Request, res: Response): Promise<void> {
     try {
       const assignment = await assignmentService.getAssignment(req.params.id);
@@ -34,8 +47,8 @@ export class AssignmentController {
 
   async getByCourse(req: Request, res: Response): Promise<void> {
     try {
-      const { courseId } = req.query;
-      const assignments = await assignmentService.getAssignmentsByCourse(courseId as string);
+      const { courseId } = req.params;
+      const assignments = await assignmentService.getAssignmentsByCourse(courseId);
       res.json({ success: true, data: assignments });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Internal server error' });
@@ -69,7 +82,25 @@ export class AssignmentController {
     }
   }
 
-  async submit(req: Request, res: Response): Promise<void> {
+  async delete(req: Request, res: Response): Promise<void> {
+    try {
+      await assignmentService.deleteAssignment(req.params.id);
+      res.json({ success: true, message: 'Assignment deleted' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async approve(req: Request, res: Response): Promise<void> {
+    try {
+      const assignment = await assignmentService.approveAssignment(req.params.id);
+      res.json({ success: true, message: 'Assignment approved', data: assignment });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async submit(dto: SubmitAssignmentDto): Promise<void> {
     try {
       const userId = (req as any).userId;
       const { textContent, files } = req.body;
@@ -122,9 +153,12 @@ export class AssignmentController {
   async getMySubmissions(req: Request, res: Response): Promise<void> {
     try {
       const userId = (req as any).userId;
+      console.log('AssignmentController.getMySubmissions called for userId:', userId);
       const submissions = await assignmentService.getStudentSubmissions(userId);
+      console.log(`AssignmentController.getMySubmissions found ${submissions.length} submissions`);
       res.json({ success: true, data: submissions });
     } catch (error) {
+      console.error('Get my submissions error:', error);
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
   }
@@ -133,6 +167,45 @@ export class AssignmentController {
     try {
       const submission = await assignmentService.returnSubmission(req.params.submissionId);
       res.json({ success: true, message: 'Returned to student', data: submission });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async assignToEmails(req: Request, res: Response): Promise<void> {
+    try {
+      const { emails } = req.body;
+      const result = await assignmentService.assignToEmails(req.params.id, emails);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async assignToBatch(req: Request, res: Response): Promise<void> {
+    try {
+      const { batchId } = req.body;
+      const result = await assignmentService.assignToBatch(req.params.id, batchId);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async uploadFile(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, message: 'No file uploaded' });
+        return;
+      }
+
+      const fileData = await assignmentService.saveFile({
+        originalname: req.file.originalname,
+        buffer: req.file.buffer,
+        size: req.file.size,
+      });
+
+      res.json({ success: true, data: fileData });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Internal server error' });
     }

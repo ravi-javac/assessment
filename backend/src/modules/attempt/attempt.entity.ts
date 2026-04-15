@@ -12,6 +12,7 @@ import { User } from '../user/user.entity';
 import { Test } from '../assessment/assessment.entity';
 
 export enum AttemptStatus {
+  NOT_STARTED = 'not_started',
   STARTED = 'started',
   IN_PROGRESS = 'in_progress',
   SUBMITTED = 'submitted',

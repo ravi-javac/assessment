@@ -1,23 +1,34 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { assignmentApi } from '@/services/assignmentApi';
-import type { Assignment } from '@/types/assignment';
-import { FileText, Clock, Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import type { AssignmentSubmission } from '@/types/assignment';
+import { 
+  FileText, 
+  Clock, 
+  CheckCircle, 
+  AlertCircle, 
+  ChevronRight,
+  BookOpen,
+  Calendar,
+  Search
+} from 'lucide-react';
 
 export default function StudentAssignments() {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const navigate = useNavigate();
+  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
-  const [submissionText, setSubmissionText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    loadAssignments();
+    loadSubmissions();
   }, []);
 
-  const loadAssignments = async () => {
+  const loadSubmissions = async () => {
     try {
       const response = await assignmentApi.getMySubmissions();
-      if (response.success) setAssignments(response.data.map((s: any) => s.assignment).filter(Boolean));
+      if (response.success) {
+        setSubmissions(response.data || []);
+      }
     } catch (error) {
       console.error('Load error:', error);
     } finally {
@@ -25,103 +36,109 @@ export default function StudentAssignments() {
     }
   };
 
-  const handleSubmit = async (assignmentId: string) => {
-    if (!submissionText.trim()) return;
-    setSubmitting(true);
-    try {
-      await assignmentApi.submit({ assignmentId, textContent: submissionText });
-      alert('Submitted successfully!');
-      setSubmissionText('');
-      setSelectedAssignment(null);
-    } catch (error: any) {
-      alert(error.message);
-    } finally {
-      setSubmitting(false);
+  const filteredSubmissions = submissions.filter(s => 
+    (s.assignment?.title || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'graded': return 'bg-green-50 text-green-700 border-green-100';
+      case 'submitted': return 'bg-blue-50 text-blue-700 border-blue-100';
+      case 'returned': return 'bg-orange-50 text-orange-700 border-orange-100';
+      case 'not_submitted': return 'bg-purple-50 text-purple-700 border-purple-100';
+      default: return 'bg-gray-50 text-gray-700 border-gray-100';
     }
   };
 
-  const isOverdue = (dueDate?: string) => {
-    if (!dueDate) return false;
-    return new Date(dueDate) < new Date();
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'not_submitted': return 'Assigned';
+      case 'in_progress': return 'In Progress';
+      default: return status;
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">My Assignments</h1>
+    <div className="min-h-screen bg-gray-50 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">My Assignments</h1>
+          <p className="text-sm text-gray-500">Track your learning progress and upcoming deadlines</p>
+        </div>
+
+        <div className="card mb-8 p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search assignments..."
+              className="input pl-10"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
 
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="card h-48 animate-pulse bg-gray-100"></div>
+            ))}
           </div>
-        ) : assignments.length === 0 ? (
-          <div className="card text-center py-8">
-            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No assignments available</p>
+        ) : filteredSubmissions.length === 0 ? (
+          <div className="card text-center py-16">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <BookOpen className="text-gray-300" size={32} />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900">No assignments assigned</h3>
+            <p className="text-gray-500 mt-1">Your assigned coursework will appear here</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {assignments.map((assignment) => {
-              const isPast = isOverdue(assignment.dueDate);
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredSubmissions.map((sub) => {
+              const assignment = sub.assignment;
+              if (!assignment) return null;
+              
+              const isOverdue = assignment.dueDate && new Date(assignment.dueDate) < new Date();
+              
               return (
-                <div key={assignment.id} className="card">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold">{assignment.title}</h3>
-                        {isPast ? (
-                          <span className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
-                            <AlertCircle size={14} /> Overdue
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
-                            <CheckCircle size={14} /> Active
-                          </span>
-                        )}
-                      </div>
-                      {assignment.description && (
-                        <p className="text-gray-600 mb-2">{assignment.description}</p>
+                <div 
+                  key={sub.id} 
+                  className="card group hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer"
+                  onClick={() => navigate(`/assignments/${assignment.id}`)}
+                >
+                  <div className="p-6 flex-1">
+                    <div className="flex justify-between items-start mb-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getStatusBadge(sub.status)}`}>
+                        {getStatusLabel(sub.status)}
+                      </span>
+                      {isOverdue && (sub.status === 'not_submitted' || sub.status === 'in_progress') && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase">
+                          <AlertCircle size={12} /> Overdue
+                        </span>
                       )}
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Clock size={16} /> Due: {assignment.dueDate ? new Date(assignment.dueDate).toLocaleString() : 'No due date'}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <FileText size={16} /> {assignment.totalMarks} marks
-                        </span>
+                    </div>
+
+                    <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors mb-4 line-clamp-1">
+                      {assignment.title}
+                    </h3>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <Calendar size={14} className="text-gray-400" />
+                        <span>Due: {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No deadline'}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <FileText size={14} className="text-gray-400" />
+                        <span>{assignment.totalMarks} Marks Available</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setSelectedAssignment(selectedAssignment?.id === assignment.id ? null : assignment)}
-                      className="btn btn-primary"
-                    >
-                      Submit
-                    </button>
                   </div>
 
-                  {selectedAssignment?.id === assignment.id && (
-                    <div className="mt-4 pt-4 border-t">
-                      <h4 className="font-medium mb-2">Your Submission</h4>
-                      {assignment.allowTextSubmission && (
-                        <textarea
-                          className="input h-32 mb-2"
-                          placeholder="Enter your answer..."
-                          value={submissionText}
-                          onChange={(e) => setSubmissionText(e.target.value)}
-                        />
-                      )}
-                      {assignment.allowFileUpload && (
-                        <p className="text-sm text-gray-500 mb-2">File upload: Coming soon</p>
-                      )}
-                      <button
-                        onClick={() => handleSubmit(assignment.id)}
-                        disabled={submitting || !submissionText}
-                        className="btn btn-primary"
-                      >
-                        {submitting ? 'Submitting...' : 'Submit Assignment'}
-                      </button>
-                    </div>
-                  )}
+                  <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between group-hover:bg-primary-50 transition-colors">
+                    <span className="text-xs font-bold text-primary-600 uppercase tracking-wide">View Details</span>
+                    <ChevronRight size={16} className="text-primary-600 transform group-hover:translate-x-1 transition-transform" />
+                  </div>
                 </div>
               );
             })}

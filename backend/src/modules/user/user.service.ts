@@ -19,11 +19,26 @@ export class UserService {
     return this.userRepository.save(user);
   }
 
-  async findAll(role?: UserRole): Promise<User[]> {
+  async findAll(role?: UserRole, skip: number = 0, take: number = 10, search?: string): Promise<{ data: User[], total: number }> {
+    const query = this.userRepository.createQueryBuilder('user');
+    
     if (role) {
-      return this.userRepository.find({ where: { role } });
+      query.andWhere('user.role = :role', { role });
     }
-    return this.userRepository.find();
+    
+    if (search) {
+      query.andWhere('(user.firstName LIKE :search OR user.lastName LIKE :search OR user.email LIKE :search)', {
+        search: `%${search}%`
+      });
+    }
+    
+    const [data, total] = await query
+      .skip(skip)
+      .take(take)
+      .orderBy('user.createdAt', 'DESC')
+      .getManyAndCount();
+      
+    return { data, total };
   }
 
   async findOne(id: string): Promise<User | null> {

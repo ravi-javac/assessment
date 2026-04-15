@@ -8,6 +8,7 @@ const questionController = new QuestionController();
 const upload = (require('multer') as any)({ storage: (require('multer') as any).memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.post('/', authMiddleware, requireRole('admin', 'faculty'), (req, res) => questionController.create(req, res));
+router.post('/bulk', authMiddleware, requireRole('admin', 'faculty'), (req, res) => questionController.bulkCreate(req, res));
 router.get('/', authMiddleware, (req, res) => questionController.getAll(req, res));
 router.get('/random', authMiddleware, (req, res) => questionController.getRandom(req, res));
 router.get('/:id', authMiddleware, (req, res) => questionController.getOne(req, res));

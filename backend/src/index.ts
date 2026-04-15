@@ -7,7 +7,7 @@ import morgan from 'morgan';
 import { createServer } from 'http';
 import { config } from './config/env';
 import { initializeDatabase } from './config/database';
-import { initializeRedis } from './config/redis';
+// import { initializeRedis } from './config/redis';
 import { logger } from './config/logger';
 
 const app = express();
@@ -17,6 +17,7 @@ app.use(cors({ origin: config.frontendUrl, credentials: true }));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -25,7 +26,7 @@ app.get('/health', (req, res) => {
 async function startServer() {
   try {
     await initializeDatabase();
-    await initializeRedis();
+    // await initializeRedis();
 
     const { default: authRoutes } = await import('./routes/auth.routes');
     const { default: userRoutes } = await import('./routes/user.routes');
@@ -52,10 +53,11 @@ async function startServer() {
     app.use('/api/questionnaires', questionnaireRoutes);
 
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+      console.error('GLOBAL ERROR:', err);
       logger.error(err.stack);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: err.message || 'Internal server error',
       });
     });
 

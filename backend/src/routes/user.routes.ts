@@ -14,11 +14,15 @@ function getUserService() {
 router.get('/', authMiddleware, requireRole('admin'), async (req, res) => {
   try {
     const userService = getUserService();
-    const { role } = req.query;
-    const users = await userService.findAll(role as UserRole);
+    const { role, page = 1, limit = 10, search = '' } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    const take = Number(limit);
+    
+    const { data, total } = await userService.findAll(role as UserRole, skip, take, search as string);
     res.json({
       success: true,
-      data: users,
+      data: data,
+      total: total,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal server error' });
@@ -55,7 +59,7 @@ router.post('/', authMiddleware, requireRole('admin'), async (req, res) => {
 router.get('/stats', authMiddleware, requireRole('admin'), async (req, res) => {
   try {
     const userService = getUserService();
-    const allUsers = await userService.findAll();
+    const { data: allUsers } = await userService.findAll(undefined, 0, 10000);
     const students = allUsers.filter(u => u.role === UserRole.STUDENT);
     const faculty = allUsers.filter(u => u.role === UserRole.FACULTY);
     const admins = allUsers.filter(u => u.role === UserRole.ADMIN);

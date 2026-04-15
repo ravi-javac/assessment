@@ -1,5 +1,7 @@
 import { Repository, getRepository } from 'typeorm';
 import { Test, Section, Subsection, TestQuestion, TestStatus, TestVisibility, ProctoringLevel } from './assessment.entity';
+import { User } from '../user/user.entity';
+import { Attempt, AttemptStatus } from '../attempt/attempt.entity';
 
 export interface TestRules {
   duration: number;
@@ -33,6 +35,8 @@ export interface CreateTestDto {
   instructions?: string;
   startDate?: Date;
   endDate?: Date;
+  isQuestionnaire?: boolean;
+  questionnaireId?: string;
   maxAttempts?: number;
   institutionId?: string;
   courseId?: string;
@@ -110,11 +114,14 @@ export class AssessmentService {
   ) {}
 
   async createTest(createDto: CreateTestDto): Promise<Test> {
+    console.log('AssessmentService.createTest called with:', createDto);
     const test = this.testRepository.create({
       ...createDto,
       status: TestStatus.DRAFT,
     });
-    return this.testRepository.save(test);
+    const savedTest = await this.testRepository.save(test);
+    console.log('AssessmentService.createTest saved test:', savedTest.id);
+    return savedTest;
   }
 
   async findAllTests(filter?: TestFilterDto): Promise<Test[]> {
@@ -149,8 +156,11 @@ export class AssessmentService {
   }
 
   async updateTest(id: string, updateData: Partial<Test>): Promise<Test | null> {
+    console.log(`AssessmentService.updateTest called for id: ${id} with:`, updateData);
     await this.testRepository.update(id, updateData);
-    return this.findTestById(id);
+    const updatedTest = await this.findTestById(id);
+    console.log(`AssessmentService.updateTest completed for id: ${id}`);
+    return updatedTest;
   }
 
   async deleteTest(id: string): Promise<void> {
@@ -361,6 +371,7 @@ export class AssessmentService {
       questionMarks?: number;
     }
   ): Promise<TestQuestion> {
+    console.log(`AssessmentService.addQuestionToTest called for test: ${testId}, question: ${questionId}`);
     let questionOrder: number;
     
     if (order) {
@@ -401,7 +412,9 @@ export class AssessmentService {
       questionAllowFlag: questionSettings?.questionAllowFlag,
       questionMarks: questionSettings?.questionMarks,
     });
-    return this.testQuestionRepository.save(testQuestion);
+    const savedTQ = await this.testQuestionRepository.save(testQuestion);
+    console.log(`AssessmentService.addQuestionToTest saved testQuestion: ${savedTQ.id}`);
+    return savedTQ;
   }
 
   async removeQuestionFromTest(testQuestionId: string): Promise<void> {
@@ -1051,15 +1064,38 @@ export class AssessmentService {
     return true;
   }
 
-  async createInvitation(testId: string, email: string): Promise<{ accessCode: string; expiresAt: Date }> {
+  async createInvitation(testId: string, email: string): Promise<{ accessCode: string; expiresAt: Date; studentFound: boolean }> {
     const test = await this.findTestById(testId);
     if (!test) {
       throw new Error('Test not found');
     }
+
+    const userRepo = getRepository(User);
+    const attemptRepo = getRepository(Attempt);
+
+    const user = await userRepo.findOne({ where: { email } });
+    
+    if (user) {
+      // Create a pending attempt for this student
+      const existingAttempt = await attemptRepo.findOne({
+        where: { testId, userId: user.id }
+      });
+
+      if (!existingAttempt) {
+        const attempt = attemptRepo.create({
+          testId,
+          userId: user.id,
+          status: AttemptStatus.NOT_STARTED,
+          totalMarks: test.totalMarks,
+        });
+        await attemptRepo.save(attempt);
+      }
+    }
+
     const accessCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
-    return { accessCode, expiresAt };
+    return { accessCode, expiresAt, studentFound: !!user };
   }
 }
 

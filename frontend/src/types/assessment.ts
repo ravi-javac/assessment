@@ -99,6 +99,7 @@ export interface Section {
   poolRandomSelection?: boolean;
   poolPullMarks?: number;
   poolPullDuration?: number;
+  allowedLanguages?: string;
   subsections?: Subsection[];
   createdAt: string;
 }
@@ -135,6 +136,7 @@ export interface Subsection {
   poolRandomSelection?: boolean;
   poolPullMarks?: number;
   poolPullDuration?: number;
+  allowedLanguages?: string;
   createdAt: string;
 }
 
@@ -201,6 +203,8 @@ export interface CreateTestDto {
   instructions?: string;
   startDate?: Date;
   endDate?: Date;
+  isQuestionnaire?: boolean;
+  questionnaireId?: string;
   maxAttempts?: number;
   totalMarks?: number;
   institutionId?: string;
@@ -230,6 +234,7 @@ export interface CreateSectionDto {
   sectionQuestionShowCorrectAnswers?: boolean;
   sectionQuestionAllowFlag?: boolean;
   sectionQuestionDefaultMarks?: number;
+  allowedLanguages?: string;
   testId: string;
 }
 
@@ -258,5 +263,6 @@ export interface CreateSubsectionDto {
   subsectionQuestionShowCorrectAnswers?: boolean;
   subsectionQuestionAllowFlag?: boolean;
   subsectionQuestionDefaultMarks?: number;
+  allowedLanguages?: string;
   sectionId: string;
 }

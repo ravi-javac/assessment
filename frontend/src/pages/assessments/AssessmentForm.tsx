@@ -23,7 +23,15 @@ const formatDateFromInput = (dateStr: string): string => {
   const parts = dateStr.split('/');
   if (parts.length !== 3) return dateStr;
   const [day, month, year] = parts;
-  return new Date(`${year}-${month}-${day}`).toISOString().split('T')[0];
+  
+  // Only convert if we have a complete DD/MM/YYYY format
+  if (day.length === 2 && month.length === 2 && year.length === 4) {
+    const date = new Date(`${year}-${month}-${day}`);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+  return dateStr;
 };
 
 interface SectionWithSubsections extends Section {
@@ -54,9 +62,19 @@ export default function AssessmentForm() {
   const { id } = useParams();
   const isEdit = !!id;
 
+  const handleLanguageToggle = (currentLanguages: string, lang: string, setter: (val: string) => void) => {
+    const langs = currentLanguages ? currentLanguages.split(',').filter(l => l) : [];
+    if (langs.includes(lang)) {
+      setter(langs.filter(l => l !== lang).join(','));
+    } else {
+      setter([...langs, lang].join(','));
+    }
+  };
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState<'basic' | 'structure' | 'questions'>('basic');
 
   const [sections, setSections] = useState<SectionWithSubsections[]>([]);
@@ -192,6 +210,7 @@ export default function AssessmentForm() {
           scheduledStartTime: test.scheduledStartTime || '',
           scheduledEndTime: test.scheduledEndTime || '',
           questionnaireId: test.questionnaireId || '',
+          isQuestionnaire: test.isQuestionnaire || false,
           emailTemplateId: test.emailTemplateId || '',
           sendResultEmail: test.sendResultEmail ?? true,
           maxAttempts: test.maxAttempts || 1,
@@ -257,10 +276,10 @@ export default function AssessmentForm() {
       const filterWithPagination: any = { ...questionFilter, page: questionPage, limit: questionPageSize };
       const res = await questionApi.getAll(filterWithPagination);
       if (res.success) {
-        setAvailableQuestions(res.data?.questions || []);
-        setTotalQuestionPages(res.data?.totalPages || 1);
+        setAvailableQuestions(res.data || []);
+        setTotalQuestionPages(Math.ceil((res.total || 0) / questionPageSize) || 1);
         const allTags = new Set<string>();
-        (res.data?.questions || []).forEach((q: Question) => {
+        (res.data || []).forEach((q: Question) => {
           q.tags?.forEach((tag: string) => allTags.add(tag));
         });
         setExistingTagNames(Array.from(allTags));
@@ -271,34 +290,56 @@ export default function AssessmentForm() {
       setLoadingQuestions(false);
     }
   };
+const handleToggleQuestionnaire = (enabled: boolean) => {
+  setFormData(prev => ({ ...prev, isQuestionnaire: enabled }));
+  if (enabled) {
+    setShowQuestionnaireModal(true);
+  } else {
+    setSelectedQuestionnaireId(undefined);
+    setFormData(prev => ({ ...prev, questionnaireId: '', isQuestionnaire: false }));
+  }
+};
 
   const handleSave = async () => {
+    if (!formData.title.trim()) {
+      setError('Test title is required');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     setSaving(true);
     setError('');
+    setSuccess('');
     try {
       const testData = {
         ...formData,
         totalMarks: calculatedTotals?.totalMarks || formData.totalMarks,
       };
-      
+
       let res;
       if (isEdit && id) {
         res = await assessmentApi.update(id, testData);
         if (res.success) {
-          navigate('/assessments');
+          setSuccess('Assessment updated successfully');
+          loadTest(id);
+          setTimeout(() => setSuccess(''), 3000);
         }
       } else {
         res = await assessmentApi.create(testData);
         if (res.success && res.data?.id) {
-          navigate(`/assessments/${res.data.id}/edit`);
+          setSuccess('Assessment created successfully');
+          setTimeout(() => {
+            navigate(`/assessments/${res.data.id}/edit`);
+          }, 1500);
         }
       }
-      
+
       if (!res?.success) {
         setError(res?.message || 'Failed to save test');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to save test');
+      console.error('Save test error:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to save test');
     } finally {
       setSaving(false);
     }
@@ -463,6 +504,7 @@ export default function AssessmentForm() {
         poolRandomSelection: subsection?.poolRandomSelection,
         poolPullMarks: subsection?.poolPullMarks,
         poolPullDuration: subsection?.poolPullDuration,
+        allowedLanguages: subsection?.allowedLanguages || '',
       });
       try {
         const res = await assessmentApi.getSubsectionSettingsWithInheritance(itemId);
@@ -684,6 +726,13 @@ export default function AssessmentForm() {
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
             <AlertCircle size={20} />
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
+            <Check size={20} />
+            {success}
           </div>
         )}
 
@@ -957,24 +1006,44 @@ export default function AssessmentForm() {
               </div>
 
               <div className="card space-y-4">
-                <h2 className="text-lg font-semibold">Questionnaire</h2>
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-semibold">Questionnaire</h2>
+                  {selectedQuestionnaireId && (
+                    <button
+                      type="button"
+                      onClick={() => setShowQuestionnaireModal(true)}
+                      className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                    >
+                      <Edit size={14} />
+                      Change Questionnaire
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={!!selectedQuestionnaireId}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setShowQuestionnaireModal(true);
-                      } else {
-                        setSelectedQuestionnaireId(undefined);
-                        setFormData({ ...formData, questionnaireId: '' });
-                      }
-                    }}
+                    id="enable-questionnaire"
+                    checked={formData.isQuestionnaire}
+                    onChange={(e) => handleToggleQuestionnaire(e.target.checked)}
                   />
-                  <span className="text-sm">Enable Questionnaire (collect student responses)</span>
+                  <label htmlFor="enable-questionnaire" className="text-sm cursor-pointer">
+                    Enable Questionnaire (collect student responses)
+                  </label>
                 </div>
                 {selectedQuestionnaireId && (
-                  <p className="text-sm text-green-600">Questionnaire enabled</p>
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="text-green-600" size={18} />
+                      <span className="text-sm text-green-700 font-medium">Questionnaire linked successfully</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => handleToggleQuestionnaire(false)}
+                      className="text-xs text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -1276,15 +1345,6 @@ export default function AssessmentForm() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Section Rules</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Duration (min)</label>
-                      <input 
-                        type="number" 
-                        value={sectionSettings.sectionDuration || ''} 
-                        onChange={(e) => setSectionSettings({...sectionSettings, sectionDuration: parseInt(e.target.value) || 0})} 
-                        className="input" 
-                      />
-                    </div>
                     <label className="flex items-center gap-2">
                       <input type="checkbox" checked={sectionSettings.sectionShowResults ?? true} onChange={(e) => setSectionSettings({...sectionSettings, sectionShowResults: e.target.checked})} />
                       <span className="text-sm">Show Results</span>
@@ -1317,6 +1377,91 @@ export default function AssessmentForm() {
                       <input type="checkbox" checked={sectionSettings.sectionAllowNotes ?? true} onChange={(e) => setSectionSettings({...sectionSettings, sectionAllowNotes: e.target.checked})} />
                       <span className="text-sm">Allow Notes</span>
                     </label>
+                    <div className="col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">Section Duration (minutes)</label>
+                      <input 
+                        type="number" 
+                        value={sectionSettings.sectionDuration || ''} 
+                        onChange={(e) => setSectionSettings({...sectionSettings, sectionDuration: parseInt(e.target.value) || 0})} 
+                        className="input h-9" 
+                        placeholder="Default from test"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Question Pulling (Pooling)</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        checked={sectionSettings.questionPoolEnabled || false} 
+                        onChange={(e) => setSectionSettings({...sectionSettings, questionPoolEnabled: e.target.checked})} 
+                      />
+                      <span className="text-sm font-medium">Enable Question Pool</span>
+                    </label>
+                    <div className="col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">Total Questions in Section</label>
+                      <input 
+                        type="number" 
+                        value={testQuestions.filter(tq => tq.sectionId === selectedItem?.id && !tq.subsectionId).length} 
+                        readOnly 
+                        className="input bg-gray-50"
+                      />
+                    </div>
+                    {sectionSettings.questionPoolEnabled && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Questions to Pull</label>
+                          <input 
+                            type="number" 
+                            value={sectionSettings.poolSize || ''} 
+                            onChange={(e) => setSectionSettings({...sectionSettings, poolSize: parseInt(e.target.value) || 0})} 
+                            className="input" 
+                            placeholder="Number of questions"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            checked={sectionSettings.poolRandomSelection ?? true} 
+                            onChange={(e) => setSectionSettings({...sectionSettings, poolRandomSelection: e.target.checked})} 
+                          />
+                          <span className="text-sm">Random Selection</span>
+                        </label>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Pull Marks (Override)</label>
+                          <input 
+                            type="number" 
+                            value={sectionSettings.poolPullMarks || ''} 
+                            onChange={(e) => setSectionSettings({...sectionSettings, poolPullMarks: parseInt(e.target.value) || 0})} 
+                            className="input" 
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Coding Environment Setup</label>
+                  <p className="text-xs text-gray-500 mb-3">Select allowed programming languages for this section</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['javascript', 'python', 'java', 'cpp'].map(lang => (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => handleLanguageToggle(sectionSettings.allowedLanguages || '', lang, (val) => setSectionSettings({...sectionSettings, allowedLanguages: val}))}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                          (sectionSettings.allowedLanguages || '').split(',').includes(lang)
+                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-primary-400 hover:text-primary-600'
+                        }`}
+                      >
+                        {lang === 'cpp' ? 'C++' : lang.charAt(0).toUpperCase() + lang.slice(1)}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1327,15 +1472,6 @@ export default function AssessmentForm() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Subsection Rules</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Duration (min)</label>
-                      <input 
-                        type="number" 
-                        value={subsectionSettings.subsectionDuration || ''} 
-                        onChange={(e) => setSubsectionSettings({...subsectionSettings, subsectionDuration: parseInt(e.target.value) || 0})} 
-                        className="input" 
-                      />
-                    </div>
                     <label className="flex items-center gap-2">
                       <input type="checkbox" checked={subsectionSettings.subsectionShowResults ?? true} onChange={(e) => setSubsectionSettings({...subsectionSettings, subsectionShowResults: e.target.checked})} />
                       <span className="text-sm">Show Results</span>
@@ -1368,6 +1504,91 @@ export default function AssessmentForm() {
                       <input type="checkbox" checked={subsectionSettings.subsectionAllowNotes ?? true} onChange={(e) => setSubsectionSettings({...subsectionSettings, subsectionAllowNotes: e.target.checked})} />
                       <span className="text-sm">Allow Notes</span>
                     </label>
+                    <div className="col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">Subsection Duration (minutes)</label>
+                      <input 
+                        type="number" 
+                        value={subsectionSettings.subsectionDuration || ''} 
+                        onChange={(e) => setSubsectionSettings({...subsectionSettings, subsectionDuration: parseInt(e.target.value) || 0})} 
+                        className="input h-9" 
+                        placeholder="Default from section"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Question Pulling (Pooling)</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        checked={subsectionSettings.questionPoolEnabled || false} 
+                        onChange={(e) => setSubsectionSettings({...subsectionSettings, questionPoolEnabled: e.target.checked})} 
+                      />
+                      <span className="text-sm font-medium">Enable Question Pool</span>
+                    </label>
+                    <div className="col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">Total Questions in Subsection</label>
+                      <input 
+                        type="number" 
+                        value={testQuestions.filter(tq => tq.subsectionId === selectedItem?.id).length} 
+                        readOnly 
+                        className="input bg-gray-50"
+                      />
+                    </div>
+                    {subsectionSettings.questionPoolEnabled && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Questions to Pull</label>
+                          <input 
+                            type="number" 
+                            value={subsectionSettings.poolSize || ''} 
+                            onChange={(e) => setSubsectionSettings({...subsectionSettings, poolSize: parseInt(e.target.value) || 0})} 
+                            className="input" 
+                            placeholder="Number of questions"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            checked={subsectionSettings.poolRandomSelection ?? true} 
+                            onChange={(e) => setSubsectionSettings({...subsectionSettings, poolRandomSelection: e.target.checked})} 
+                          />
+                          <span className="text-sm">Random Selection</span>
+                        </label>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Pull Marks (Override)</label>
+                          <input 
+                            type="number" 
+                            value={subsectionSettings.poolPullMarks || ''} 
+                            onChange={(e) => setSubsectionSettings({...subsectionSettings, poolPullMarks: parseInt(e.target.value) || 0})} 
+                            className="input" 
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Coding Environment Setup</label>
+                  <p className="text-xs text-gray-500 mb-3">Select allowed programming languages for this subsection</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['javascript', 'python', 'java', 'cpp'].map(lang => (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => handleLanguageToggle(subsectionSettings.allowedLanguages || '', lang, (val) => setSubsectionSettings({...subsectionSettings, allowedLanguages: val}))}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                          (subsectionSettings.allowedLanguages || '').split(',').includes(lang)
+                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-primary-400 hover:text-primary-600'
+                        }`}
+                      >
+                        {lang === 'cpp' ? 'C++' : lang.charAt(0).toUpperCase() + lang.slice(1)}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1581,13 +1802,23 @@ export default function AssessmentForm() {
           </div>
         </Modal>
 
-        <Modal isOpen={showQuestionnaireModal} onClose={() => setShowQuestionnaireModal(false)} title="Select Questionnaire" size="md">
+        <Modal isOpen={showQuestionnaireModal} onClose={() => {
+          setShowQuestionnaireModal(false);
+          if (!selectedQuestionnaireId) {
+            setFormData(prev => ({ ...prev, isQuestionnaire: false }));
+          }
+        }} title="Select Questionnaire" size="md">
           <QuestionnaireManager
             isOpen={showQuestionnaireModal}
-            onClose={() => setShowQuestionnaireModal(false)}
+            onClose={() => {
+              setShowQuestionnaireModal(false);
+              if (!selectedQuestionnaireId) {
+                setFormData(prev => ({ ...prev, isQuestionnaire: false }));
+              }
+            }}
             onSelect={(questionnaire) => {
               setSelectedQuestionnaireId(questionnaire.id);
-              setFormData({ ...formData, questionnaireId: questionnaire.id });
+              setFormData(prev => ({ ...prev, questionnaireId: questionnaire.id, isQuestionnaire: true }));
               setShowQuestionnaireModal(false);
             }}
             selectedQuestionnaireId={selectedQuestionnaireId}

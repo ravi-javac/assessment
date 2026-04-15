@@ -212,7 +212,7 @@ export default function QuestionnaireManager({ isOpen, onClose, onSelect, select
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {selectedQuestionnaireId && onSelect && (
+                    {onSelect && (
                       <button
                         onClick={() => onSelect(q)}
                         className="btn btn-primary text-sm"

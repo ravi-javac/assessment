@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+  import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
@@ -9,8 +9,8 @@ export const config = {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306', 10),
     username: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || 'password',
-    name: process.env.DB_NAME || 'sameeksha_ai',
+    password: process.env.DB_PASSWORD || 'toor',
+    name: process.env.DB_NAME || 'SAMEEKSHA_AI',
   },
 
   redis: {

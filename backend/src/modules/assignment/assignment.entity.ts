@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { User } from '../user/user.entity';
@@ -13,6 +14,14 @@ export enum AssignmentStatus {
   DRAFT = 'draft',
   PUBLISHED = 'published',
   CLOSED = 'closed',
+}
+
+export enum AssignmentType {
+  MCQ = 'mcq',
+  CODING = 'coding',
+  SUBJECTIVE = 'subjective',
+  FILE = 'file',
+  MIXED = 'mixed',
 }
 
 @Entity('assignments')
@@ -26,8 +35,24 @@ export class Assignment {
   @Column('text', { nullable: true })
   description: string;
 
+  @Column({
+    type: 'enum',
+    enum: AssignmentType,
+    default: AssignmentType.MIXED,
+  })
+  type: AssignmentType;
+
   @Column({ nullable: true })
   courseId: string;
+
+  @Column({ nullable: true })
+  semester: string;
+
+  @Column({ nullable: true })
+  batch: string;
+
+  @Column({ nullable: true })
+  section: string;
 
   @Column({ nullable: true })
   institutionId: string;
@@ -48,6 +73,9 @@ export class Assignment {
 
   @Column({ nullable: true })
   dueDate: Date;
+
+  @Column({ nullable: true })
+  startDate: Date;
 
   @Column({ type: 'int', default: 100 })
   totalMarks: number;
@@ -73,7 +101,19 @@ export class Assignment {
   @Column({ default: 1 })
   maxFiles: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', default: 1 })
+  maxAttempts: number;
+
+  @Column({ default: false })
+  isAdminApproved: boolean;
+
+  @Column({ type: 'int', nullable: true })
+  durationMinutes: number;
+
+  @Column('simple-json', { nullable: true })
+  readingMaterials: { title: string; url: string; type: string }[];
+
+  @Column({ type: 'text', nullable: true })
   instructions: string;
 
   @Column({ default: 0 })
@@ -82,11 +122,40 @@ export class Assignment {
   @Column({ default: 0 })
   gradedSubmissions: number;
 
+  @OneToMany(() => AssignmentQuestion, (aq) => aq.assignment)
+  questions: AssignmentQuestion[];
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+}
+
+@Entity('assignment_questions')
+export class AssignmentQuestion {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  assignmentId: string;
+
+  @ManyToOne(() => Assignment, (assignment) => assignment.questions, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'assignmentId' })
+  assignment: Assignment;
+
+  @Column()
+  questionId: string;
+
+  @ManyToOne('Question', { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'questionId' })
+  question: any; // Using any because Question is in another module
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  marks: number;
+
+  @Column({ type: 'int', default: 0 })
+  order: number;
 }
 
 @Entity('assignment_submissions')
@@ -117,6 +186,9 @@ export class AssignmentSubmission {
   @Column({ default: false })
   isLate: boolean;
 
+  @Column({ type: 'int', default: 1 })
+  attemptNumber: number;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   marksObtained: number;
 
@@ -135,14 +207,52 @@ export class AssignmentSubmission {
 
   @Column({
     type: 'enum',
-    enum: ['submitted', 'graded', 'returned'],
+    enum: ['submitted', 'graded', 'returned', 'in_progress', 'not_submitted'],
     default: 'submitted',
   })
   status: string;
+
+  @OneToMany(() => AttemptAnswer, (aa) => aa.submission)
+  answers: AttemptAnswer[];
 
   @CreateDateColumn()
   submittedAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+}
+
+@Entity('assignment_attempt_answers')
+export class AttemptAnswer {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  submissionId: string;
+
+  @ManyToOne(() => AssignmentSubmission, (submission) => submission.answers, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'submissionId' })
+  submission: AssignmentSubmission;
+
+  @Column()
+  questionId: string;
+
+  @ManyToOne('Question')
+  @JoinColumn({ name: 'questionId' })
+  question: any;
+
+  @Column('text', { nullable: true })
+  answer: string;
+
+  @Column('simple-json', { nullable: true })
+  codingAnswer: { code: string; language: string; results?: any };
+
+  @Column('simple-json', { nullable: true })
+  mcqAnswer: { selectedOption: string; isCorrect: boolean };
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  marksObtained: number;
+
+  @Column({ nullable: true })
+  feedback: string;
 }

@@ -60,6 +60,9 @@ export class User {
   departmentId: string;
 
   @Column({ nullable: true })
+  batchId: string;
+
+  @Column({ nullable: true })
   profileImage: string;
 
   @Column({ default: false })

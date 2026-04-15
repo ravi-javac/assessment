@@ -93,18 +93,26 @@ export class BulkUploadService {
 
     const getValue = (colNames: string[]): any => {
       for (const col of colNames) {
-        const idx = headers[col.toLowerCase()];
+        const idx = headers[col.toLowerCase().trim()];
         if (idx !== undefined && idx < values.length) {
-          return values[idx];
+          const val = values[idx];
+          // Handle ExcelJS RichText or object values
+          if (val && typeof val === 'object' && val.richText) {
+            return val.richText.map((rt: any) => rt.text).join('');
+          }
+          if (val && typeof val === 'object' && val.text) {
+            return val.text;
+          }
+          return val;
         }
       }
       return null;
     };
 
-    const questionStatement = getValue(['question statement', 'question statement ']) as string;
-    const correctAnswerText = getValue(['correct answer-1', 'correct answer- 1']) as string;
+    const questionStatement = getValue(['question statement', 'question statement ', 'statement', 'content']);
+    const correctAnswerText = getValue(['correct answer-1', 'correct answer- 1', 'correct answer', 'answer']);
 
-    if (!questionStatement) {
+    if (!questionStatement || !questionStatement.toString().trim()) {
       return null;
     }
 
@@ -112,13 +120,17 @@ export class BulkUploadService {
     const optionLabels = ['Option 1', 'Option 2', 'Option 3', 'Option 4', 'Option 5'];
     const optionKeys = ['A', 'B', 'C', 'D', 'E'];
 
+    const cleanCorrectAnswer = correctAnswerText?.toString().trim().toLowerCase();
+
     for (let i = 0; i < optionLabels.length; i++) {
-      const optValue = getValue([optionLabels[i], `option ${i + 1}`]) as string;
-      if (optValue && optValue.trim()) {
-        const isCorrect = correctAnswerText?.trim().toLowerCase() === optValue.trim().toLowerCase();
+      const optValue = getValue([optionLabels[i], `option ${i + 1}`, `option${i + 1}`]);
+      if (optValue !== null && optValue !== undefined && optValue.toString().trim()) {
+        const stringOptValue = optValue.toString().trim();
+        const isCorrect = cleanCorrectAnswer === stringOptValue.toLowerCase();
+        
         options.push({
           key: optionKeys[i],
-          value: optValue.trim(),
+          value: stringOptValue,
           isCorrect,
         });
       }
@@ -128,28 +140,36 @@ export class BulkUploadService {
       throw new Error('No options found for question');
     }
 
-    const correctOption = options.find(o => o.isCorrect);
-    if (!correctOption) {
-      throw new Error('Correct answer not found among options');
+    // If no option matched the correct answer text exactly, try matching by key (A, B, C...)
+    if (!options.some(o => o.isCorrect) && cleanCorrectAnswer) {
+      const keyIndex = optionKeys.findIndex(k => k.toLowerCase() === cleanCorrectAnswer);
+      if (keyIndex !== -1 && options[keyIndex]) {
+        options[keyIndex].isCorrect = true;
+      }
     }
 
-    const levelStr = (getValue(['level', 'difficulty']) as string)?.toLowerCase();
+    const correctOption = options.find(o => o.isCorrect);
+    if (!correctOption) {
+      throw new Error(`Correct answer "${correctAnswerText}" not found among options`);
+    }
+
+    const levelStr = (getValue(['level', 'difficulty']) as string)?.toString().toLowerCase().trim();
     let difficulty = QuestionDifficulty.MEDIUM;
     if (levelStr === 'easy') difficulty = QuestionDifficulty.EASY;
     if (levelStr === 'hard') difficulty = QuestionDifficulty.HARD;
 
-    const stateStr = (getValue(['state', 'status']) as string)?.toLowerCase();
+    const stateStr = (getValue(['state', 'status']) as string)?.toString().toLowerCase().trim();
     let status = QuestionStatus.DRAFT;
-    if (stateStr === 'ready' || stateStr === 'active') status = QuestionStatus.ACTIVE;
+    if (stateStr === 'ready' || stateStr === 'active' || stateStr === 'live') status = QuestionStatus.ACTIVE;
     if (stateStr === 'archived') status = QuestionStatus.ARCHIVED;
 
-    const tagStr = getValue(['tag', 'tags']) as string;
-    const tags = tagStr ? [tagStr.trim()] : [];
+    const tagStr = getValue(['tag', 'tags'])?.toString();
+    const tags = tagStr ? tagStr.split(',').map(t => t.trim()).filter(t => t) : [];
 
     const marks = 1;
 
     return {
-      content: questionStatement,
+      content: questionStatement.toString().trim(),
       type: QuestionType.MCQ,
       difficulty,
       status,

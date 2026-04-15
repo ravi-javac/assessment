@@ -15,6 +15,7 @@ export enum QuestionType {
   CODING = 'coding',
   SUBJECTIVE = 'subjective',
   SQL = 'sql',
+  SUBMISSION = 'submission',
 }
 
 export enum QuestionDifficulty {
@@ -34,7 +35,7 @@ export class Question {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ type: 'text' })
   title: string;
 
   @Column('text')
@@ -70,7 +71,7 @@ export class Question {
   @Column({ nullable: true })
   correctAnswer: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   correctAnswerExplanation: string;
 
   @Column({ type: 'text', nullable: true })
@@ -78,6 +79,12 @@ export class Question {
 
   @Column({ nullable: true })
   language: string;
+
+  @Column({ nullable: true })
+  allowedFileTypes: string; // e.g., ".pdf,.zip,.doc"
+
+  @Column({ type: 'int', nullable: true, default: 10 })
+  maxFileSizeMB: number;
 
   @Column('simple-json', { nullable: true })
   testCases: { input: string; expectedOutput: string; isHidden: boolean }[];

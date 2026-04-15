@@ -37,7 +37,7 @@ export class Test {
   @Column()
   title: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({
@@ -109,10 +109,10 @@ export class Test {
   @Column({ default: true })
   allowNotes: boolean;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   resultMessage: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   instructions: string;
 
   @Column({ nullable: true })
@@ -176,7 +176,7 @@ export class Section {
   @Column()
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ type: 'int', default: 0 })
@@ -254,6 +254,9 @@ export class Section {
   @Column({ nullable: true, type: 'int' })
   poolPullDuration: number;
 
+  @Column({ type: 'text', nullable: true })
+  allowedLanguages: string; // Comma-separated languages for coding questions
+
   @Column({
     type: 'enum',
     enum: ProctoringLevel,
@@ -283,7 +286,7 @@ export class Subsection {
   @Column()
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ type: 'int', default: 0 })
@@ -366,6 +369,9 @@ export class Subsection {
 
   @Column({ nullable: true, type: 'int' })
   poolPullDuration: number;
+
+  @Column({ type: 'text', nullable: true })
+  allowedLanguages: string; // Comma-separated languages for coding questions
 
   @Column({
     type: 'enum',

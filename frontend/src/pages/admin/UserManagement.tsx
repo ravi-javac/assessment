@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Search, Trash2, Edit, Shield, GraduationCap, UserCog, X, Loader2, UserX } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { 
+  Users, Plus, Search, Trash2, Edit, Shield, GraduationCap, 
+  UserCog, X, Loader2, UserX, ArrowLeft, ChevronLeft, ChevronRight 
+} from 'lucide-react';
 import api from '@/services/api';
 import type { User, UserRole, UserStatus } from '@/types';
 
@@ -35,12 +38,24 @@ export default function UserManagement() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
 
   const fetchUsers = async () => {
     try {
-      const res = await api.get(`/users${roleFilter ? `?role=${roleFilter}` : ''}`);
+      setLoading(true);
+      const res = await api.get('/users', {
+        params: {
+          role: roleFilter || undefined,
+          page,
+          limit,
+          search
+        }
+      });
       if (res.data.success) {
         setUsers(res.data.data);
+        setTotal(res.data.total);
       }
     } catch (err) {
       console.error('Failed to fetch users:', err);
@@ -56,7 +71,19 @@ export default function UserManagement() {
       return;
     }
     fetchUsers();
-  }, [roleFilter]);
+  }, [roleFilter, page, limit]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (page !== 1) {
+        setPage(1);
+      } else {
+        fetchUsers();
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const openCreateModal = () => {
     setEditingUser(null);
@@ -143,10 +170,6 @@ export default function UserManagement() {
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(search.toLowerCase())
-  );
-
   const getRoleIcon = (role: UserRole) => {
     const r = ROLES.find(r => r.value === role);
     return r?.icon || Users;
@@ -157,9 +180,18 @@ export default function UserManagement() {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <Users className="w-6 h-6 text-primary-600" />
-              <h1 className="text-xl font-bold text-gray-900">User Management</h1>
+            <div className="flex items-center gap-4">
+              <Link 
+                to="/dashboard"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-all hover:scale-110 text-gray-600"
+                title="Back to Dashboard"
+              >
+                <ArrowLeft size={24} />
+              </Link>
+              <div className="flex items-center gap-3">
+                <Users className="w-6 h-6 text-primary-600" />
+                <h1 className="text-xl font-bold text-gray-900">User Management</h1>
+              </div>
             </div>
             <button
               onClick={openCreateModal}
@@ -213,14 +245,14 @@ export default function UserManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredUsers.length === 0 ? (
+                {users.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                       No users found
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map(user => {
+                  users.map(user => {
                     const RoleIcon = getRoleIcon(user.role);
                     const statusStyle = STATUSES.find(s => s.value === user.status)?.color || 'bg-gray-100';
                     return (
@@ -277,6 +309,50 @@ export default function UserManagement() {
                 )}
               </tbody>
             </table>
+            
+            {/* Pagination */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                Showing <span className="font-medium">{users.length > 0 ? (page - 1) * limit + 1 : 0}</span> to{' '}
+                <span className="font-medium">{Math.min(page * limit, total)}</span> of{' '}
+                <span className="font-medium">{total}</span> users
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-2 rounded-lg border border-gray-300 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.ceil(total / limit) }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === Math.ceil(total / limit) || Math.abs(p - page) <= 1)
+                    .map((p, i, arr) => (
+                      <div key={p} className="flex items-center">
+                        {i > 0 && arr[i-1] !== p - 1 && <span className="px-2 text-gray-400">...</span>}
+                        <button
+                          onClick={() => setPage(p)}
+                          className={`w-10 h-10 rounded-lg border font-medium transition-all ${
+                            page === p 
+                              ? 'bg-primary-600 text-white border-primary-600 shadow-sm' 
+                              : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400 hover:text-primary-600'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+                <button
+                  onClick={() => setPage(p => Math.min(Math.ceil(total / limit), p + 1))}
+                  disabled={page >= Math.ceil(total / limit)}
+                  className="p-2 rounded-lg border border-gray-300 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

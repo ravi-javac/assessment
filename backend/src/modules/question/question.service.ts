@@ -12,6 +12,8 @@ export interface CreateQuestionDto {
   correctAnswerExplanation?: string;
   codeTemplate?: string;
   language?: string;
+  allowedFileTypes?: string;
+  maxFileSizeMB?: number;
   testCases?: { input: string; expectedOutput: string; isHidden: boolean }[];
   marks?: number;
   institutionId?: string;
@@ -26,6 +28,8 @@ export interface QuestionFilterDto {
   institutionId?: string;
   createdById?: string;
   search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export class QuestionService {
@@ -34,13 +38,24 @@ export class QuestionService {
   async create(createDto: CreateQuestionDto): Promise<Question> {
     const question = this.questionRepository.create({
       ...createDto,
-      status: QuestionStatus.DRAFT,
+      status: createDto.status || QuestionStatus.DRAFT,
       tags: createDto.tags || [],
     });
     return this.questionRepository.save(question);
   }
 
-  async findAll(filter?: QuestionFilterDto): Promise<Question[]> {
+  async bulkCreate(questionsData: CreateQuestionDto[]): Promise<Question[]> {
+    const questions = this.questionRepository.create(
+      questionsData.map(q => ({
+        ...q,
+        status: q.status || QuestionStatus.ACTIVE,
+        tags: q.tags || [],
+      }))
+    );
+    return this.questionRepository.save(questions);
+  }
+
+  async findAll(filter?: QuestionFilterDto): Promise<{ data: Question[]; total: number }> {
     const query = this.questionRepository.createQueryBuilder('question');
 
     if (filter?.type) {
@@ -67,7 +82,14 @@ export class QuestionService {
       query.andWhere('question.tags LIKE :tags', { tags: `%${filter.tags[0]}%` });
     }
 
-    return query.orderBy('question.createdAt', 'DESC').getMany();
+    const total = await query.getCount();
+
+    if (filter?.page && filter?.limit) {
+      query.skip((filter.page - 1) * filter.limit).take(filter.limit);
+    }
+
+    const data = await query.orderBy('question.createdAt', 'DESC').getMany();
+    return { data, total };
   }
 
   async findOne(id: string): Promise<Question | null> {
@@ -78,8 +100,11 @@ export class QuestionService {
   }
 
   async update(id: string, updateData: Partial<Question>): Promise<Question | null> {
-    await this.questionRepository.update(id, updateData);
-    return this.findOne(id);
+    const question = await this.findOne(id);
+    if (!question) return null;
+    
+    Object.assign(question, updateData);
+    return this.questionRepository.save(question);
   }
 
   async delete(id: string): Promise<void> {
@@ -100,7 +125,7 @@ export class QuestionService {
     filter: QuestionFilterDto,
     count: number
   ): Promise<Question[]> {
-    const questions = await this.findAll({
+    const { data: questions } = await this.findAll({
       ...filter,
       status: QuestionStatus.ACTIVE,
     });

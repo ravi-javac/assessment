@@ -7,6 +7,11 @@ export const questionApi = {
     return response.data;
   },
 
+  bulkCreate: async (questions: Partial<Question>[]) => {
+    const response = await api.post('/questions/bulk', { questions });
+    return response.data;
+  },
+
   getAll: async (filter?: QuestionFilter & { page?: number; limit?: number }) => {
     const response = await api.get('/questions', { params: filter });
     return response.data;

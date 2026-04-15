@@ -1,4 +1,4 @@
-export type QuestionType = 'mcq' | 'coding' | 'subjective' | 'sql';
+export type QuestionType = 'mcq' | 'coding' | 'subjective' | 'sql' | 'submission';
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionStatus = 'draft' | 'active' | 'archived';
 
@@ -27,6 +27,8 @@ export interface Question {
   correctAnswerExplanation?: string;
   codeTemplate?: string;
   language?: string;
+  allowedFileTypes?: string;
+  maxFileSizeMB?: number;
   testCases?: TestCase[];
   marks: number;
   institutionId?: string;

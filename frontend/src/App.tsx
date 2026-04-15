@@ -4,11 +4,18 @@ import Login from '@/pages/auth/Login';
 import Register from '@/pages/auth/Register';
 import Dashboard from '@/pages/dashboard/Dashboard';
 import QuestionBank from '@/pages/questions/QuestionBank';
+import QuestionForm from '@/pages/questions/QuestionForm';
+import { QuestionBulkReviewPage } from '@/pages/questions/QuestionBulkReview';
 import AssessmentList from '@/pages/assessments/AssessmentList';
 import AssessmentForm from '@/pages/assessments/AssessmentForm';
 import ExamInterface from '@/pages/exam/ExamInterface';
 import FacultyMonitoring from '@/pages/dashboard/FacultyMonitoring';
 import AssignmentList from '@/pages/assignments/AssignmentList';
+import AssignmentForm from '@/pages/assignments/AssignmentForm';
+import AssignmentDetails from '@/pages/assignments/AssignmentDetails';
+import AssignmentAttempt from '@/pages/assignments/AssignmentAttempt';
+import AssignmentSubmissions from '@/pages/assignments/AssignmentSubmissions';
+import AssignmentGrading from '@/pages/assignments/AssignmentGrading';
 import StudentAssignments from '@/pages/assignments/StudentAssignments';
 import AttendanceList from '@/pages/attendance/AttendanceList';
 import StudentAttendance from '@/pages/attendance/StudentAttendance';
@@ -52,6 +59,30 @@ export default function App() {
         }
       />
       <Route
+        path="/questions/new"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'faculty']}>
+            <QuestionForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/questions/:id"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'faculty']}>
+            <QuestionForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/questions/bulk-review"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'faculty']}>
+            <QuestionBulkReviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/assessments"
         element={
           <ProtectedRoute allowedRoles={['admin', 'faculty']}>
@@ -80,6 +111,54 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={['admin', 'faculty']}>
             <AssignmentList />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/assignments/new"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'faculty']}>
+            <AssignmentForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/assignments/:id/edit"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'faculty']}>
+            <AssignmentForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/assignments/:id"
+        element={
+          <ProtectedRoute>
+            <AssignmentDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/assignments/:id/attempt"
+        element={
+          <ProtectedRoute>
+            <AssignmentAttempt />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/assignments/:id/submissions"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'faculty']}>
+            <AssignmentSubmissions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/assignments/submissions/:submissionId/grade"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'faculty']}>
+            <AssignmentGrading />
           </ProtectedRoute>
         }
       />

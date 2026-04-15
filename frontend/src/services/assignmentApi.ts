@@ -7,6 +7,20 @@ export const assignmentApi = {
     return response.data;
   },
 
+  getAll: async (filter?: { courseId?: string; status?: string }) => {
+    const response = await api.get('/assignments', { params: filter });
+    return response.data;
+  },
+
+  uploadFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/assignments/upload-file', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   get: async (id: string) => {
     const response = await api.get(`/assignments/${id}`);
     return response.data;
@@ -22,6 +36,11 @@ export const assignmentApi = {
     return response.data;
   },
 
+  delete: async (id: string) => {
+    const response = await api.delete(`/assignments/${id}`);
+    return response.data;
+  },
+
   publish: async (id: string) => {
     const response = await api.post(`/assignments/${id}/publish`);
     return response.data;
@@ -32,6 +51,11 @@ export const assignmentApi = {
     return response.data;
   },
 
+  approve: async (id: string) => {
+    const response = await api.post(`/assignments/${id}/approve`);
+    return response.data;
+  },
+
   getSubmissions: async (id: string) => {
     const response = await api.get(`/assignments/${id}/submissions`);
     return response.data;
@@ -39,6 +63,16 @@ export const assignmentApi = {
 
   getReport: async (id: string) => {
     const response = await api.get(`/assignments/${id}/report`);
+    return response.data;
+  },
+
+  assignToEmails: async (id: string, emails: string[]) => {
+    const response = await api.post(`/assignments/${id}/assign-emails`, { emails });
+    return response.data;
+  },
+
+  assignToBatch: async (id: string, batchId: string) => {
+    const response = await api.post(`/assignments/${id}/assign-batch`, { batchId });
     return response.data;
   },
 

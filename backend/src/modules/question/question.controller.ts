@@ -31,9 +31,33 @@ export class QuestionController {
     }
   }
 
+  async bulkCreate(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).userId;
+      const questionsData = req.body.questions.map((q: any) => ({
+        ...q,
+        createdById: userId,
+      }));
+
+      const questions = await questionService.bulkCreate(questionsData);
+
+      res.status(201).json({
+        success: true,
+        message: `${questions.length} questions created successfully`,
+        data: questions,
+      });
+    } catch (error) {
+      console.error('Bulk create questions error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
   async getAll(req: Request, res: Response): Promise<void> {
     try {
-      const { type, difficulty, status, tags, search, institutionId } = req.query;
+      const { type, difficulty, status, tags, search, institutionId, page, limit } = req.query;
       const filter: QuestionFilterDto = {
         type: type as any,
         difficulty: difficulty as any,
@@ -41,13 +65,16 @@ export class QuestionController {
         tags: tags ? [tags as string] : undefined,
         search: search as string,
         institutionId: institutionId as string,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
       };
 
-      const questions = await questionService.findAll(filter);
+      const { data, total } = await questionService.findAll(filter);
 
       res.json({
         success: true,
-        data: questions,
+        data,
+        total,
       });
     } catch (error) {
       console.error('Get questions error:', error);
