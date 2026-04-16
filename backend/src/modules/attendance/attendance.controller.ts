@@ -109,8 +109,46 @@ export class AttendanceController {
       );
 
       res.json({ success: true, message: 'Attendance marked', data: record });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Mark manual error:', error);
+      res.status(error.message.includes('locked') ? 403 : 500).json({ 
+        success: false, 
+        message: error.message || 'Internal server error' 
+      });
+    }
+  }
+
+  async markBatch(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).userId;
+      const { sessionId, batchId, status } = req.body;
+
+      await attendanceService.markBatchAttendance(sessionId, batchId, userId, status);
+      res.json({ success: true, message: `Batch marked as ${status}` });
+    } catch (error: any) {
+      console.error('Mark batch error:', error);
+      res.status(error.message.includes('locked') ? 403 : 500).json({ 
+        success: false, 
+        message: error.message || 'Internal server error' 
+      });
+    }
+  }
+
+  async toggleLock(req: Request, res: Response): Promise<void> {
+    try {
+      const { isLocked } = req.body;
+      const session = await attendanceService.lockSession(req.params.sessionId, isLocked);
+      res.json({ success: true, message: `Session ${isLocked ? 'locked' : 'unlocked'}`, data: session });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async getBatchHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const history = await attendanceService.getBatchHistory(req.params.batchId);
+      res.json({ success: true, data: history });
+    } catch (error) {
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
   }
@@ -137,7 +175,9 @@ export class AttendanceController {
 
   async getActiveSessions(req: Request, res: Response): Promise<void> {
     try {
-      const sessions = await attendanceService.getActiveSessions();
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const sessions = await attendanceService.getActiveSessions(userId, userRole);
       res.json({ success: true, data: sessions });
     } catch (error) {
       console.error('Get active sessions error:', error);

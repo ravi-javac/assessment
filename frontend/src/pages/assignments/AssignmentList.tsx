@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { assignmentApi } from '@/services/assignmentApi';
+import { batchApi, Batch } from '@/services/batchApi';
+import { authApi } from '@/services/api';
 import { useAuthStore } from '@/services/authStore';
 import type { Assignment, AssignmentStatus } from '@/types/assignment';
 import { 
@@ -29,12 +31,13 @@ import { Modal } from '@/components/PopupMenu';
 
 export default function AssignmentList() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<AssignmentStatus | 'all'>('all');
   
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [assignType, setAssignType] = useState<'email' | 'batch'>('email');
@@ -43,8 +46,29 @@ export default function AssignmentList() {
   const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await authApi.getProfile();
+        if (res.success) setUser(res.data);
+      } catch (err) {
+        console.error('Profile fetch error:', err);
+      }
+    };
+    fetchProfile();
     loadAssignments();
+    fetchBatches();
   }, [statusFilter]);
+
+  const fetchBatches = async () => {
+    try {
+      const res = await batchApi.getAll();
+      if (res.success) {
+        setBatches(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch batches:', err);
+    }
+  };
 
   const loadAssignments = async () => {
     setLoading(true);
@@ -387,14 +411,17 @@ export default function AssignmentList() {
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Batch ID</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Academic Batch</label>
+                <select
                   className="input"
-                  placeholder="e.g. BATCH-2024-A"
                   value={batchId}
                   onChange={(e) => setBatchId(e.target.value)}
-                />
+                >
+                  <option value="">Choose a batch...</option>
+                  {batches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name} ({b.students?.length || 0} Students)</option>
+                  ))}
+                </select>
                 <p className="mt-2 text-xs text-gray-400">
                   Assign to all students currently registered in this batch.
                 </p>

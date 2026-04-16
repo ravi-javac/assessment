@@ -32,7 +32,7 @@ router.get('/', authMiddleware, requireRole('admin'), async (req, res) => {
 router.post('/', authMiddleware, requireRole('admin'), async (req, res) => {
   try {
     const userService = getUserService();
-    const { email, password, firstName, lastName, phone, role } = req.body;
+    const { email, password, firstName, lastName, phone, role, batchId } = req.body;
     if (!email || !password || !firstName || !lastName) {
       res.status(400).json({ success: false, message: 'All fields are required' });
       return;
@@ -49,6 +49,7 @@ router.post('/', authMiddleware, requireRole('admin'), async (req, res) => {
       lastName,
       phone,
       role: role as UserRole || UserRole.STUDENT,
+      batchId,
     });
     res.status(201).json({ success: true, data: user });
   } catch (error) {

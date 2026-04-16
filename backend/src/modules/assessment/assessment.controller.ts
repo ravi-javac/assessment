@@ -176,12 +176,17 @@ export class AssessmentController {
   async getAllTests(req: Request, res: Response): Promise<void> {
     try {
       const { status, visibility, search, institutionId, courseId } = req.query;
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+
       const filter: TestFilterDto = {
         status: status as any,
         visibility: visibility as any,
         search: search as string,
         institutionId: institutionId as string,
         courseId: courseId as string,
+        userId,
+        userRole
       };
 
       const tests = await assessmentService.findAllTests(filter);
@@ -226,7 +231,9 @@ export class AssessmentController {
 
   async updateTest(req: Request, res: Response): Promise<void> {
     try {
-      const test = await assessmentService.updateTest(req.params.id, req.body);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const test = await assessmentService.updateTest(req.params.id, req.body, userId, userRole);
 
       if (!test) {
         res.status(404).json({
@@ -241,35 +248,38 @@ export class AssessmentController {
         message: 'Test updated successfully',
         data: test,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update test error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
-
   async deleteTest(req: Request, res: Response): Promise<void> {
     try {
-      await assessmentService.deleteTest(req.params.id);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      await assessmentService.deleteTest(req.params.id, userId, userRole);
 
       res.json({
         success: true,
         message: 'Test deleted successfully',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete test error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async publishTest(req: Request, res: Response): Promise<void> {
     try {
-      const test = await assessmentService.publishTest(req.params.id);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const test = await assessmentService.publishTest(req.params.id, userId, userRole);
 
       if (!test) {
         res.status(404).json({
@@ -286,7 +296,9 @@ export class AssessmentController {
       });
     } catch (error: any) {
       console.error('Publish test error:', error);
-      const statusCode = error.message === 'Test must have a duration set before publishing' ? 400 : 500;
+      let statusCode = 500;
+      if (error.message === 'Test must have a duration set before publishing') statusCode = 400;
+      if (error.message.includes('Access denied')) statusCode = 403;
       res.status(statusCode).json({
         success: false,
         message: error.message || 'Internal server error',
@@ -296,7 +308,9 @@ export class AssessmentController {
 
   async goLive(req: Request, res: Response): Promise<void> {
     try {
-      const test = await assessmentService.goLive(req.params.id);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const test = await assessmentService.goLive(req.params.id, userId, userRole);
 
       if (!test) {
         res.status(404).json({
@@ -311,18 +325,20 @@ export class AssessmentController {
         message: 'Test is now live',
         data: test,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Go live error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async pauseTest(req: Request, res: Response): Promise<void> {
     try {
-      const test = await assessmentService.pauseTest(req.params.id);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const test = await assessmentService.pauseTest(req.params.id, userId, userRole);
 
       if (!test) {
         res.status(404).json({
@@ -337,46 +353,50 @@ export class AssessmentController {
         message: 'Test paused',
         data: test,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Pause test error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async generateAccessCode(req: Request, res: Response): Promise<void> {
     try {
-      const code = await assessmentService.generateAccessCode(req.params.id);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const code = await assessmentService.generateAccessCode(req.params.id, userId, userRole);
 
       res.json({
         success: true,
         data: { accessCode: code },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Generate access code error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async createSection(req: Request, res: Response): Promise<void> {
     try {
-      const section = await assessmentService.createSection(req.body);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const section = await assessmentService.createSection(req.body, userId, userRole);
 
       res.status(201).json({
         success: true,
         message: 'Section created successfully',
         data: section,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Create section error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
@@ -400,7 +420,9 @@ export class AssessmentController {
 
   async updateSection(req: Request, res: Response): Promise<void> {
     try {
-      const section = await assessmentService.updateSection(req.params.id, req.body);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const section = await assessmentService.updateSection(req.params.id, req.body, userId, userRole);
 
       if (!section) {
         res.status(404).json({
@@ -415,46 +437,50 @@ export class AssessmentController {
         message: 'Section updated',
         data: section,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update section error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async deleteSection(req: Request, res: Response): Promise<void> {
     try {
-      await assessmentService.deleteSection(req.params.id);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      await assessmentService.deleteSection(req.params.id, userId, userRole);
 
       res.json({
         success: true,
         message: 'Section deleted',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete section error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async createSubsection(req: Request, res: Response): Promise<void> {
     try {
-      const subsection = await assessmentService.createSubsection(req.body);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const subsection = await assessmentService.createSubsection(req.body, userId, userRole);
 
       res.status(201).json({
         success: true,
         message: 'Subsection created successfully',
         data: subsection,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Create subsection error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
@@ -478,7 +504,9 @@ export class AssessmentController {
 
   async updateSubsection(req: Request, res: Response): Promise<void> {
     try {
-      const subsection = await assessmentService.updateSubsection(req.params.id, req.body);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const subsection = await assessmentService.updateSubsection(req.params.id, req.body, userId, userRole);
 
       if (!subsection) {
         res.status(404).json({
@@ -493,34 +521,38 @@ export class AssessmentController {
         message: 'Subsection updated',
         data: subsection,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update subsection error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async deleteSubsection(req: Request, res: Response): Promise<void> {
     try {
-      await assessmentService.deleteSubsection(req.params.id);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      await assessmentService.deleteSubsection(req.params.id, userId, userRole);
 
       res.json({
         success: true,
         message: 'Subsection deleted',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete subsection error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async addQuestion(req: Request, res: Response): Promise<void> {
     try {
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
       const { questionId, sectionId, subsectionId, marks, order, questionSettings } = req.body;
       const testQuestion = await assessmentService.addQuestionToTest(
         req.params.testId,
@@ -529,7 +561,9 @@ export class AssessmentController {
         subsectionId,
         marks,
         order,
-        questionSettings
+        questionSettings,
+        userId,
+        userRole
       );
 
       res.status(201).json({
@@ -537,28 +571,30 @@ export class AssessmentController {
         message: 'Question added to test',
         data: testQuestion,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Add question error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async removeQuestion(req: Request, res: Response): Promise<void> {
     try {
-      await assessmentService.removeQuestionFromTest(req.params.testQuestionId);
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      await assessmentService.removeQuestionFromTest(req.params.testQuestionId, userId, userRole);
 
       res.json({
         success: true,
         message: 'Question removed from test',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Remove question error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
@@ -582,19 +618,21 @@ export class AssessmentController {
 
   async cloneTest(req: Request, res: Response): Promise<void> {
     try {
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
       const { newTitle } = req.body;
-      const test = await assessmentService.cloneTest(req.params.id, newTitle);
+      const test = await assessmentService.cloneTest(req.params.id, newTitle, userId, userRole);
 
       res.status(201).json({
         success: true,
         message: 'Test cloned successfully',
         data: test,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Clone test error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }

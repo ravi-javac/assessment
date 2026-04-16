@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { User } from '../user/user.entity';
@@ -27,6 +28,9 @@ export class AttendanceSession {
 
   @Column({ nullable: true })
   courseId: string;
+
+  @Column({ nullable: true })
+  batchId: string;
 
   @Column({ nullable: true })
   institutionId: string;
@@ -86,6 +90,12 @@ export class AttendanceSession {
 
   @Column({ default: 0 })
   totalLate: number;
+
+  @Column({ default: false })
+  isLocked: boolean;
+
+  @OneToMany(() => AttendanceRecord, (record) => record.session)
+  records: AttendanceRecord[];
 
   @CreateDateColumn()
   createdAt: Date;

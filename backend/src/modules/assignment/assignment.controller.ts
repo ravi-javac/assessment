@@ -22,9 +22,14 @@ export class AssignmentController {
   async getAll(req: Request, res: Response): Promise<void> {
     try {
       const { courseId, status } = req.query;
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      
       const assignments = await assignmentService.findAll({
         courseId: courseId as string,
         status: status as any,
+        userId,
+        userRole
       });
       res.json({ success: true, data: assignments });
     } catch (error) {

@@ -112,8 +112,9 @@ export class QuestionController {
 
   async update(req: Request, res: Response): Promise<void> {
     try {
-      const question = await questionService.update(req.params.id, req.body);
-
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      const question = await questionService.update(req.params.id, req.body, userId, userRole);
       if (!question) {
         res.status(404).json({
           success: false,
@@ -121,34 +122,34 @@ export class QuestionController {
         });
         return;
       }
-
       res.json({
         success: true,
         message: 'Question updated successfully',
         data: question,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update question error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }
 
   async delete(req: Request, res: Response): Promise<void> {
     try {
-      await questionService.delete(req.params.id);
-
+      const userId = (req as any).userId;
+      const userRole = (req as any).userRole;
+      await questionService.delete(req.params.id, userId, userRole);
       res.json({
         success: true,
         message: 'Question deleted successfully',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete question error:', error);
-      res.status(500).json({
+      res.status(error.message.includes('Access denied') ? 403 : 500).json({
         success: false,
-        message: 'Internal server error',
+        message: error.message || 'Internal server error',
       });
     }
   }

@@ -99,15 +99,34 @@ export class QuestionService {
     });
   }
 
-  async update(id: string, updateData: Partial<Question>): Promise<Question | null> {
+  async update(id: string, updateData: Partial<Question>, userId?: string, userRole?: string): Promise<Question | null> {
     const question = await this.findOne(id);
     if (!question) return null;
-    
+
+    // Correct logic:
+    if (userRole === 'faculty' && userId) {
+      const creator = await AppDataSource.getRepository(User).findOne({ where: { id: question.createdById } });
+      if (creator && creator.role === 'admin' && question.createdById !== userId) {
+        throw new Error('Access denied: You cannot edit Admin-created questions');
+      }
+    }
+
     Object.assign(question, updateData);
     return this.questionRepository.save(question);
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, userId?: string, userRole?: string): Promise<void> {
+    const question = await this.findOne(id);
+    if (!question) return;
+
+    // RBAC: Faculty cannot delete Admin-created questions
+    if (userRole === 'faculty' && userId) {
+      const creator = await AppDataSource.getRepository(User).findOne({ where: { id: question.createdById } });
+      if (creator && creator.role === 'admin' && question.createdById !== userId) {
+        throw new Error('Access denied: You cannot delete Admin-created questions');
+      }
+    }
+
     await this.questionRepository.delete(id);
   }
 

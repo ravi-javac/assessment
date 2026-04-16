@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { assessmentApi } from '@/services/assessmentApi';
+import { useAuthStore } from '@/services/authStore';
 import type { Test, TestFilter } from '@/types/assessment';
 import { Plus, Search, Edit, Trash2, Play, Pause, Copy, Key, Eye, ArrowLeft, RefreshCw } from 'lucide-react';
 
@@ -20,6 +21,7 @@ const formatTime = (timeStr: string | undefined | null): string => {
 
 export default function AssessmentList() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TestFilter>({});
@@ -221,7 +223,7 @@ export default function AssessmentList() {
                       <td className="py-3 px-4">{getStatusBadge(test.status)}</td>
                       <td className="py-3 px-4">
                         <div className="flex gap-2">
-                          {test.status === 'draft' && (
+                          {(user?.role === 'admin' || test.createdById === user?.id) && test.status === 'draft' && (
                             <button
                               onClick={() => handlePublish(test.id)}
                               className="p-1 text-blue-600 hover:text-blue-700"
@@ -230,7 +232,7 @@ export default function AssessmentList() {
                               <Eye size={18} />
                             </button>
                           )}
-                          {(test.status === 'published' || test.status === 'paused') && (
+                          {(user?.role === 'admin' || test.createdById === user?.id) && (test.status === 'published' || test.status === 'paused') && (
                             <button
                               onClick={() => handleGoLive(test.id)}
                               className="p-1 text-green-600 hover:text-green-700"
@@ -239,7 +241,7 @@ export default function AssessmentList() {
                               <Play size={18} />
                             </button>
                           )}
-                          {test.status === 'live' && (
+                          {(user?.role === 'admin' || test.createdById === user?.id) && test.status === 'live' && (
                             <button
                               onClick={() => handlePause(test.id)}
                               className="p-1 text-yellow-600 hover:text-yellow-700"
@@ -248,27 +250,31 @@ export default function AssessmentList() {
                               <Pause size={18} />
                             </button>
                           )}
-                          <button
-                            onClick={() => handleGenerateCode(test.id)}
-                            className="p-1 text-purple-600 hover:text-purple-700"
-                            title="Generate Access Code"
-                          >
-                            <Key size={18} />
-                          </button>
+                          {(user?.role === 'admin' || test.createdById === user?.id) && (
+                            <button
+                              onClick={() => handleGenerateCode(test.id)}
+                              className="p-1 text-purple-600 hover:text-purple-700"
+                              title="Generate Access Code"
+                            >
+                              <Key size={18} />
+                            </button>
+                          )}
                           <Link
                             to={`/assessments/${test.id}/edit`}
                             className="p-1 text-blue-600 hover:text-blue-700"
-                            title="Edit"
+                            title={(user?.role === 'admin' || test.createdById === user?.id) ? "Edit" : "View"}
                           >
-                            <Edit size={18} />
+                            {(user?.role === 'admin' || test.createdById === user?.id) ? <Edit size={18} /> : <Eye size={18} />}
                           </Link>
-                          <button
-                            onClick={() => handleDelete(test.id)}
-                            className="p-1 text-red-600 hover:text-red-700"
-                            title="Delete"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          {(user?.role === 'admin' || test.createdById === user?.id) && (
+                            <button
+                              onClick={() => handleDelete(test.id)}
+                              className="p-1 text-red-600 hover:text-red-700"
+                              title="Delete"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

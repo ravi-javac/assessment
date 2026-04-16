@@ -78,7 +78,10 @@ export class AuthService {
 
   async validateUserCredentials(email: string, password: string): Promise<User | null> {
     const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({ where: { email } });
+    const user = await userRepository.findOne({ 
+      where: { email },
+      relations: ['assignedBatches']
+    });
     if (!user) {
       return null;
     }

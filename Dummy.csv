@@ -1,0 +1,11 @@
+Student ID,Student Name,Student Email,Course,Batch,Date,Total Days,Present,Absent,Leave,% Attendance,Remarks
+STU001,Ravi Kumar,ravi.kumar@mail.com,BCA,BCA-1A,2026-04-01,30,26,3,1,86.67%,Good
+STU002,Anjali Singh,anjali@mail.com,BCA,BCA-1A,2026-04-01,30,28,1,1,93.33%,Excellent
+STU003,Aman Verma,aman@mail.com,BCA,BCA-1A,2026-04-01,30,20,8,2,66.67%,Needs Improvement
+STU004,Neha Sharma,neha@mail.com,BCA,BCA-1A,2026-04-01,30,27,2,1,90.00%,Very Good
+STU005,Rohit Mehta,rohit@mail.com,BCA,BCA-1A,2026-04-01,30,18,10,2,60.00%,Poor
+STU006,Pooja Gupta,pooja@mail.com,BCA,BCA-1A,2026-04-01,30,25,4,1,83.33%,Good
+STU007,Karan Patel,karan@mail.com,BCA,BCA-1A,2026-04-01,30,29,0,1,96.67%,Outstanding
+STU008,Sneha Iyer,sneha@mail.com,BCA,BCA-1A,2026-04-01,30,22,6,2,73.33%,Average
+STU009,Arjun Das,arjun@mail.com,BCA,BCA-1A,2026-04-01,30,24,5,1,80.00%,Good
+STU010,Meera Nair,meera@mail.com,BCA,BCA-1A,2026-04-01,30,30,0,0,100.00%,Perfect

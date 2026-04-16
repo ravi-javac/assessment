@@ -83,7 +83,7 @@ export class AssignmentService {
     return this.getAssignment(savedAssignment.id) as Promise<Assignment>;
   }
 
-  async findAll(filter?: { courseId?: string; status?: AssignmentStatus }): Promise<Assignment[]> {
+  async findAll(filter?: { courseId?: string; status?: AssignmentStatus; userId?: string; userRole?: string }): Promise<Assignment[]> {
     const query = this.assignmentRepository.createQueryBuilder('assignment');
 
     if (filter?.courseId) {
@@ -91,6 +91,31 @@ export class AssignmentService {
     }
     if (filter?.status) {
       query.andWhere('assignment.status = :status', { status: filter.status });
+    }
+
+    // Faculty Restriction: Only see assignments assigned to their batches
+    if (filter?.userRole === UserRole.FACULTY && filter?.userId) {
+      const user = await this.userRepository.findOne({
+        where: { id: filter.userId },
+        relations: ['assignedBatches']
+      });
+      const batchIds = user?.assignedBatches.map(b => b.id) || [];
+      
+      if (batchIds.length > 0) {
+        // Find assignments that have submissions from these batches
+        query.andWhere(qb => {
+          const subQuery = qb.subQuery()
+            .select('sub.assignmentId')
+            .from('assignment_submissions', 'sub')
+            .leftJoin('users', 'u', 'u.id = sub.studentId')
+            .where('u.batchId IN (:...batchIds)', { batchIds })
+            .getQuery();
+          return 'assignment.id IN ' + subQuery;
+        });
+      } else {
+        // If no batches assigned, they can only see what they created
+        query.andWhere('assignment.createdById = :userId', { userId: filter.userId });
+      }
     }
 
     return query.orderBy('assignment.createdAt', 'DESC').getMany();

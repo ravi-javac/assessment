@@ -1,12 +1,14 @@
 import { Repository, getRepository } from 'typeorm';
 import { AttendanceSession, AttendanceRecord, AttendanceStatus } from './attendance.entity';
-import { User } from '../user/user.entity';
+import { User, UserRole } from '../user/user.entity';
 import * as QRCode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
+import { AppDataSource } from '../../config/database';
 
 export interface CreateSessionDto {
   title: string;
   courseId?: string;
+  batchId?: string;
   institutionId?: string;
   createdById: string;
   scheduledStart?: Date;
@@ -37,7 +39,7 @@ export class AttendanceService {
     private sessionRepository: Repository<AttendanceSession>,
     private recordRepository: Repository<AttendanceRecord>
   ) {
-    this.userRepository = getRepository(User);
+    this.userRepository = AppDataSource.getRepository(User);
   }
 
   async createSession(dto: CreateSessionDto): Promise<AttendanceSession> {
@@ -68,11 +70,24 @@ export class AttendanceService {
     });
   }
 
-  async getActiveSessions(): Promise<AttendanceSession[]> {
-    return this.sessionRepository.find({
-      where: { status: 'active' as any },
-      order: { createdAt: 'DESC' },
-    });
+  async getActiveSessions(userId?: string, userRole?: string): Promise<AttendanceSession[]> {
+    const query = this.sessionRepository.createQueryBuilder('session')
+      .where('session.status IN (:...statuses)', { statuses: ['active', 'scheduled'] });
+
+    if (userRole === 'faculty' && userId) {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+        relations: ['assignedBatches']
+      });
+      const batchIds = user?.assignedBatches.map(b => b.id) || [];
+      if (batchIds.length > 0) {
+        query.andWhere('session.batchId IN (:...batchIds)', { batchIds });
+      } else {
+        query.andWhere('session.createdById = :userId', { userId });
+      }
+    }
+
+    return query.orderBy('session.createdAt', 'DESC').getMany();
   }
 
   async startSession(sessionId: string): Promise<AttendanceSession | null> {
@@ -92,8 +107,18 @@ export class AttendanceService {
     const session = await this.getSession(sessionId);
     if (session) {
       session.status = 'completed';
+      session.isLocked = true; // Auto-lock on completion
       await this.sessionRepository.save(session);
       await this.calculateSessionStats(sessionId);
+    }
+    return session;
+  }
+
+  async lockSession(sessionId: string, isLocked: boolean): Promise<AttendanceSession | null> {
+    const session = await this.getSession(sessionId);
+    if (session) {
+      session.isLocked = isLocked;
+      await this.sessionRepository.save(session);
     }
     return session;
   }
@@ -105,6 +130,33 @@ export class AttendanceService {
       await this.sessionRepository.save(session);
     }
     return session;
+  }
+
+  async markBatchAttendance(
+    sessionId: string,
+    batchId: string,
+    markedById: string,
+    status: AttendanceStatus
+  ): Promise<void> {
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error('Session not found');
+    if (session.isLocked) throw new Error('Session is locked');
+
+    const students = await this.userRepository.find({
+      where: { batchId },
+    });
+
+    for (const student of students) {
+      await this.markManual(sessionId, student.id, markedById, status);
+    }
+  }
+
+  async getBatchHistory(batchId: string): Promise<AttendanceSession[]> {
+    return this.sessionRepository.find({
+      where: { batchId },
+      relations: ['records', 'records.user'],
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async generateQRCode(sessionId: string): Promise<string> {
@@ -154,6 +206,7 @@ export class AttendanceService {
   async markAttendance(dto: MarkAttendanceDto): Promise<AttendanceRecord> {
     const session = await this.getSession(dto.sessionId);
     if (!session) throw new Error('Session not found');
+    if (session.isLocked) throw new Error('Attendance is locked for this session');
 
     if (session.requireQRCode && dto.qrCode) {
       const isValid = await this.validateQRCode(dto.sessionId, dto.qrCode);
@@ -221,6 +274,10 @@ export class AttendanceService {
     status: AttendanceStatus,
     remarks?: string
   ): Promise<AttendanceRecord> {
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error('Session not found');
+    if (session.isLocked) throw new Error('Attendance is locked for this session');
+
     const existing = await this.recordRepository.findOne({
       where: { sessionId, userId },
     });

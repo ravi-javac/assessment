@@ -1,4 +1,4 @@
-import { Repository, getRepository } from 'typeorm';
+import { Repository, getRepository, Brackets } from 'typeorm';
 import { Test, Section, Subsection, TestQuestion, TestStatus, TestVisibility, ProctoringLevel } from './assessment.entity';
 import { User } from '../user/user.entity';
 import { Attempt, AttemptStatus } from '../attempt/attempt.entity';
@@ -130,9 +130,17 @@ export class AssessmentService {
     if (filter?.status) {
       query.andWhere('test.status = :status', { status: filter.status });
     }
-    if (filter?.visibility) {
+    
+    // RBAC: Faculty Visibility
+    if (filter?.userRole === 'faculty' && filter?.userId) {
+      query.andWhere(new Brackets(qb => {
+        qb.where('test.visibility = :public', { public: TestVisibility.PUBLIC })
+          .orWhere('test.createdById = :userId', { userId: filter.userId });
+      }));
+    } else if (filter?.visibility) {
       query.andWhere('test.visibility = :visibility', { visibility: filter.visibility });
     }
+
     if (filter?.institutionId) {
       query.andWhere('test.institutionId = :institutionId', { institutionId: filter.institutionId });
     }
@@ -155,19 +163,33 @@ export class AssessmentService {
     });
   }
 
-  async updateTest(id: string, updateData: Partial<Test>): Promise<Test | null> {
+  private async checkPermission(id: string, userId?: string, userRole?: string): Promise<void> {
+    if (userRole === 'faculty' && userId) {
+      const test = await this.testRepository.findOne({ where: { id } });
+      if (test && test.createdById !== userId) {
+        throw new Error('Access denied: You can only modify your own assessments');
+      }
+    }
+  }
+
+  async updateTest(id: string, updateData: Partial<Test>, userId?: string, userRole?: string): Promise<Test | null> {
     console.log(`AssessmentService.updateTest called for id: ${id} with:`, updateData);
+    
+    await this.checkPermission(id, userId, userRole);
+
     await this.testRepository.update(id, updateData);
     const updatedTest = await this.findTestById(id);
     console.log(`AssessmentService.updateTest completed for id: ${id}`);
     return updatedTest;
   }
 
-  async deleteTest(id: string): Promise<void> {
+  async deleteTest(id: string, userId?: string, userRole?: string): Promise<void> {
+    await this.checkPermission(id, userId, userRole);
     await this.testRepository.delete(id);
   }
 
-  async publishTest(id: string): Promise<Test | null> {
+  async publishTest(id: string, userId?: string, userRole?: string): Promise<Test | null> {
+    await this.checkPermission(id, userId, userRole);
     const test = await this.findTestById(id);
     if (!test) {
       throw new Error('Test not found');
@@ -189,7 +211,8 @@ export class AssessmentService {
     return this.findTestById(id);
   }
 
-  async goLive(id: string): Promise<Test | null> {
+  async goLive(id: string, userId?: string, userRole?: string): Promise<Test | null> {
+    await this.checkPermission(id, userId, userRole);
     const test = await this.findTestById(id);
     if (!test) {
       throw new Error('Test not found');
@@ -219,7 +242,8 @@ export class AssessmentService {
     return this.findTestById(id);
   }
 
-  async pauseTest(id: string): Promise<Test | null> {
+  async pauseTest(id: string, userId?: string, userRole?: string): Promise<Test | null> {
+    await this.checkPermission(id, userId, userRole);
     const test = await this.findTestById(id);
     if (!test) {
       throw new Error('Test not found');
@@ -242,12 +266,14 @@ export class AssessmentService {
     return this.findTestById(id);
   }
 
-  async completeTest(id: string): Promise<Test | null> {
+  async completeTest(id: string, userId?: string, userRole?: string): Promise<Test | null> {
+    await this.checkPermission(id, userId, userRole);
     await this.testRepository.update(id, { status: TestStatus.COMPLETED });
     return this.findTestById(id);
   }
 
-  async generateAccessCode(id: string): Promise<string> {
+  async generateAccessCode(id: string, userId?: string, userRole?: string): Promise<string> {
+    await this.checkPermission(id, userId, userRole);
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     await this.testRepository.update(id, { accessCode: code });
     return code;
@@ -258,7 +284,8 @@ export class AssessmentService {
     return test?.accessCode === code;
   }
 
-  async createSection(createDto: CreateSectionDto): Promise<Section> {
+  async createSection(createDto: CreateSectionDto, userId?: string, userRole?: string): Promise<Section> {
+    await this.checkPermission(createDto.testId, userId, userRole);
     const maxOrder = await this.sectionRepository
       .createQueryBuilder('section')
       .where('section.testId = :testId', { testId: createDto.testId })
@@ -279,14 +306,18 @@ export class AssessmentService {
     });
   }
 
-  async updateSection(id: string, updateData: Partial<Section>): Promise<Section | null> {
+  async updateSection(id: string, updateData: Partial<Section>, userId?: string, userRole?: string): Promise<Section | null> {
+    const section = await this.sectionRepository.findOne({ where: { id } });
+    if (section) await this.checkPermission(section.testId, userId, userRole);
+
     await this.sectionRepository.update(id, updateData);
     return this.sectionRepository.findOne({ where: { id } });
   }
 
-  async deleteSection(id: string): Promise<void> {
+  async deleteSection(id: string, userId?: string, userRole?: string): Promise<void> {
     const section = await this.sectionRepository.findOne({ where: { id } });
     if (section) {
+      await this.checkPermission(section.testId, userId, userRole);
       await this.sectionRepository.delete(id);
       await this.reorderSections(section.testId);
     }
@@ -305,8 +336,11 @@ export class AssessmentService {
     }
   }
 
-  async createSubsection(createDto: CreateSubsectionDto): Promise<Subsection> {
+  async createSubsection(createDto: CreateSubsectionDto, userId?: string, userRole?: string): Promise<Subsection> {
     const subsectionRepo = getRepository(Subsection);
+    const section = await this.sectionRepository.findOne({ where: { id: createDto.sectionId } });
+    if (section) await this.checkPermission(section.testId, userId, userRole);
+
     const maxOrder = await subsectionRepo
       .createQueryBuilder('subsection')
       .where('subsection.sectionId = :sectionId', { sectionId: createDto.sectionId })
@@ -328,16 +362,25 @@ export class AssessmentService {
     });
   }
 
-  async updateSubsection(id: string, updateData: Partial<Subsection>): Promise<Subsection | null> {
+  async updateSubsection(id: string, updateData: Partial<Subsection>, userId?: string, userRole?: string): Promise<Subsection | null> {
     const subsectionRepo = getRepository(Subsection);
+    const subsection = await subsectionRepo.findOne({ where: { id } });
+    if (subsection) {
+      const section = await this.sectionRepository.findOne({ where: { id: subsection.sectionId } });
+      if (section) await this.checkPermission(section.testId, userId, userRole);
+    }
+
     await subsectionRepo.update(id, updateData);
     return subsectionRepo.findOne({ where: { id } });
   }
 
-  async deleteSubsection(id: string): Promise<void> {
+  async deleteSubsection(id: string, userId?: string, userRole?: string): Promise<void> {
     const subsectionRepo = getRepository(Subsection);
     const subsection = await subsectionRepo.findOne({ where: { id } });
     if (subsection) {
+      const section = await this.sectionRepository.findOne({ where: { id: subsection.sectionId } });
+      if (section) await this.checkPermission(section.testId, userId, userRole);
+
       await subsectionRepo.delete(id);
       await this.reorderSubsections(subsection.sectionId);
     }
@@ -369,9 +412,12 @@ export class AssessmentService {
       questionShowCorrectAnswers?: boolean;
       questionAllowFlag?: boolean;
       questionMarks?: number;
-    }
+    },
+    userId?: string,
+    userRole?: string
   ): Promise<TestQuestion> {
     console.log(`AssessmentService.addQuestionToTest called for test: ${testId}, question: ${questionId}`);
+    await this.checkPermission(testId, userId, userRole);
     let questionOrder: number;
     
     if (order) {
@@ -417,13 +463,14 @@ export class AssessmentService {
     return savedTQ;
   }
 
-  async removeQuestionFromTest(testQuestionId: string): Promise<void> {
+  async removeQuestionFromTest(testQuestionId: string, userId?: string, userRole?: string): Promise<void> {
     const testQuestion = await this.testQuestionRepository.findOne({ 
       where: { id: testQuestionId },
       relations: ['section', 'subsection']
     });
     
     if (testQuestion) {
+      await this.checkPermission(testQuestion.testId, userId, userRole);
       const testId = testQuestion.testId;
       await this.testQuestionRepository.delete(testQuestionId);
       await this.reorderTestQuestions(testId, testQuestion.sectionId, testQuestion.subsectionId);
@@ -469,7 +516,7 @@ export class AssessmentService {
     return this.findSectionsByTest(testId);
   }
 
-  async cloneTest(testId: string, newTitle: string): Promise<Test> {
+  async cloneTest(testId: string, newTitle: string, userId?: string, userRole?: string): Promise<Test> {
     const originalTest = await this.findTestById(testId);
     if (!originalTest) {
       throw new Error('Test not found');

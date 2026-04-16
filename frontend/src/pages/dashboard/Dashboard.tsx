@@ -13,14 +13,28 @@ interface MenuItem {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/login');
+      return;
     }
+
+    const fetchProfile = async () => {
+      try {
+        const res = await authApi.getProfile();
+        if (res.success) {
+          setUser(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err);
+      }
+    };
+
+    fetchProfile();
   }, [navigate]);
 
   const handleLogout = async () => {
@@ -133,6 +147,29 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+
+        {user?.role === 'faculty' && (
+          <div className="mb-8">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-600" />
+              Your Assigned Batches
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {user?.assignedBatches && user.assignedBatches.length > 0 ? (
+                user.assignedBatches.map((batch: any) => (
+                  <div key={batch.id} className="card bg-white border-l-4 border-l-indigo-500 py-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/attendance?batchId=${batch.id}`)}>
+                    <p className="font-bold text-gray-900">{batch.name}</p>
+                    <p className="text-xs text-gray-500 mt-1 uppercase tracking-tighter">{batch.courseId || 'Academic Batch'}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full p-6 bg-indigo-50 rounded-xl border border-indigo-100 text-center">
+                  <p className="text-sm text-indigo-700 font-medium">No batches assigned yet. Please contact admin.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {user?.role === 'student' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

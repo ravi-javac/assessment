@@ -5,7 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  ManyToMany,
+  JoinColumn,
 } from 'typeorm';
+import { Batch } from './batch.entity';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -61,6 +65,13 @@ export class User {
 
   @Column({ nullable: true })
   batchId: string;
+
+  @ManyToOne(() => Batch, (batch) => batch.students, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'batchId' })
+  batch: Batch;
+
+  @ManyToMany(() => Batch, (batch) => batch.assignedFaculty)
+  assignedBatches: Batch[];
 
   @Column({ nullable: true })
   profileImage: string;

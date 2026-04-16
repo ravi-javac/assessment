@@ -22,6 +22,11 @@ export const attendanceApi = {
     return response.data;
   },
 
+  toggleLock: async (sessionId: string, isLocked: boolean) => {
+    const response = await api.post(`/attendance/sessions/${sessionId}/lock`, { isLocked });
+    return response.data;
+  },
+
   getQRCode: async (sessionId: string) => {
     const response = await api.get(`/attendance/sessions/${sessionId}/qrcode`);
     return response.data;
@@ -62,6 +67,20 @@ export const attendanceApi = {
     remarks?: string;
   }) => {
     const response = await api.post('/attendance/mark-manual', data);
+    return response.data;
+  },
+
+  markBatch: async (data: {
+    sessionId: string;
+    batchId: string;
+    status: string;
+  }) => {
+    const response = await api.post('/attendance/mark-batch', data);
+    return response.data;
+  },
+
+  getBatchHistory: async (batchId: string) => {
+    const response = await api.get(`/attendance/batch/${batchId}/history`);
     return response.data;
   },
 

@@ -39,18 +39,20 @@ async function startServer() {
     const { default: assignmentRoutes } = await import('./routes/assignment.routes');
     const { default: reportRoutes } = await import('./routes/report.routes');
     const { default: questionnaireRoutes } = await import('./routes/questionnaire.routes');
+    const { default: batchRoutes } = await import('./routes/batch.routes');
 
     app.use('/api/auth', authRoutes);
     app.use('/api/users', userRoutes);
     app.use('/api/questions', questionRoutes);
     app.use('/api/assessments', assessmentRoutes);
-    app.use('/api/exam', examRoutes);
+    app.use('/api/exams', examRoutes);
     app.use('/api/proctoring', proctoringRoutes);
     app.use('/api/monitoring', monitoringRoutes);
     app.use('/api/attendance', attendanceRoutes);
     app.use('/api/assignments', assignmentRoutes);
     app.use('/api/reports', reportRoutes);
     app.use('/api/questionnaires', questionnaireRoutes);
+    app.use('/api/batches', batchRoutes);
 
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
       console.error('GLOBAL ERROR:', err);

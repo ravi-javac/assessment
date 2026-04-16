@@ -12,6 +12,8 @@ export interface User {
   status: UserStatus;
   institutionId?: string;
   departmentId?: string;
+  batchId?: string;
+  assignedBatches?: any[];
   profileImage?: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;

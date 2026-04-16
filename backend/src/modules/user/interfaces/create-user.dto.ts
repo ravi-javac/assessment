@@ -9,6 +9,7 @@ export interface CreateUserDto {
   role?: UserRole;
   institutionId?: string;
   departmentId?: string;
+  batchId?: string;
 }
 
 export interface UpdateUserDto {
@@ -19,6 +20,7 @@ export interface UpdateUserDto {
   profileImage?: string;
   institutionId?: string;
   departmentId?: string;
+  batchId?: string;
 }
 
 export interface UserResponseDto {

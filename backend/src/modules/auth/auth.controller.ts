@@ -103,6 +103,8 @@ export class AuthController {
             firstName: user.firstName,
             lastName: user.lastName,
             role: user.role,
+            assignedBatches: user.assignedBatches,
+            batch: user.batch,
           },
           token,
         },
@@ -283,18 +285,7 @@ export class AuthController {
 
       res.json({
         success: true,
-        data: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          phone: user.phone,
-          profileImage: user.profileImage,
-          isEmailVerified: user.isEmailVerified,
-          isPhoneVerified: user.isPhoneVerified,
-          lastLogin: user.lastLogin,
-        },
+        data: user,
       });
     } catch (error) {
       console.error('Get profile error:', error);
